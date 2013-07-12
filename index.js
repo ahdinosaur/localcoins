@@ -2,9 +2,7 @@ var path = require('path'),
     url = require('url'),
     fs = require('fs'),
     readline = require('readline'),
-    resource = require('resource'),
-    request = require('request'),
-    async = require('async');
+    resource = require('resource');
 
 var clientID = "cff0d0765c4648791ba9",
     clientSecret = "4cc3b235432c1ea8a4c2e877ee287a199e9ee025";
@@ -21,6 +19,7 @@ if (process.env.XDG_CONFIG_HOME) {
   configPath = path.join(process.env.HOME, ".config/localcoins");
 }
 
+localcoins = resource.define('localcoins');
 
 /**
  * prompts for username and password
@@ -43,6 +42,7 @@ var promptUserAndPass = function (callback) {
     });
   });
 };
+localcoins.method('promptUserAndPass', promptUserAndPass);
 
 /**
  * authenticates using username and password
@@ -50,6 +50,7 @@ var promptUserAndPass = function (callback) {
  * @param {string} options.pass password
  */
 var authUsingUserAndPass = function (options, callback) {
+  var request = require('request');
   request.post(site.root + "/oauth2/access_token", {
     form: {
       client_id: clientID,
@@ -72,25 +73,28 @@ var authUsingUserAndPass = function (options, callback) {
     });
   });
 };
+localcoins.method('authUsingUserAndPass', authUsingUserAndPass);
 
 /**
  *
  */
 var authFlow = function(callback) {
+  var async = require('async');
   async.waterfall([
-    promptUserAndPass,
-    authUsingUserAndPass],
+    localcoins.promptUserAndPass,
+    localcoins.authUsingUserAndPass],
     function(err, credentials) {
       console.log(err, credentials);
       if (err) {
         return callback(err);
       } else if (!credentials) {
-        return authFlow(callback);
+        return localcoins.authFlow(callback);
       } else {
         return callback(null, credentials);
       }
     });
 };
+localcoins.method('authFlow', authFlow);
 
 /**
  * read config
@@ -106,6 +110,7 @@ var readConfig = function (callback) {
     }
   });
 };
+localcoins.method('readConfig', readConfig);
 
 /**
  * write config
@@ -114,21 +119,8 @@ var writeConfig = function (config, callback) {
   var str = JSON.stringify(config, null, 2);
   fs.writeFile(configPath, str, callback);
 };
+localcoins.method('writeConfig', writeConfig);
 
-
-/**
- * saves credentials for later use
- */
-var saveCredentials = function (credentials, callback) {
-  // read existing config
-    if (err) { return callback(err); }
-  config.credentials = config.credentials || {};
-  config.credentials[site.name] = credentials;
-  writeConfig(config, function(err) {
-    // return access token for immediate use
-    return callback(err, credentials.accessToken);
-  });
-};
 
 /**
  *
@@ -143,18 +135,18 @@ var recurseProps = function (obj, props) {
 };
 
 var token = function(callback) {
-
+  var async = require('async');
   async.waterfall([
-    readConfig,
+    localcoins.readConfig,
     function(config, callback) {
       config.credentials = config.credentials || {};
       config.credentials[site.name] = config.credentials[site.name] || {};
       // TODO support using refresh token
       if (!config.credentials[site.name].accessToken) {
-        authFlow(function(err, credentials) {
+        localcoins.authFlow(function(err, credentials) {
           if (err) { return callback(err); }
           config.credentials[site.name] = credentials;
-          writeConfig(config, function(err) {
+          localcoins.writeConfig(config, function(err) {
             return callback(err, config);
           });
         });
@@ -168,9 +160,11 @@ var token = function(callback) {
     }],
     callback);
 };
+localcoins.method('token', token);
 
 var post = function(route, data, callback) {
-  token(function(err, token) {
+  var request = require('request');
+  localcoins.token(function(err, token) {
     var form = data;
     form.access_token = token;
     request.post(site.root + route, {
@@ -180,6 +174,27 @@ var post = function(route, data, callback) {
     });
   });
 };
+localcoins.method('post', post, {
+  description: "retrieves token and posts to localcoins site",
+  properties: {
+    route: {
+      type: 'string',
+      format: 'uri'
+    },
+    data: {
+      type: 'object'
+    },
+    callback: {
+      type: 'function'
+    }
+  }
+});
+
+localcoins.dependencies = {
+  'async': '*',
+  'request': '*',
+  'prompt-lite': '*'
+};
 
 
 //
@@ -187,9 +202,10 @@ var post = function(route, data, callback) {
 //
 
 var escrows = resource.define('escrows');
+escrows.dependencies = {};
 
 var escrowsAll = function (callback) {
-  post('/api/escrows/', {}, callback);
+  localcoins.post('/api/escrows/', {}, callback);
 };
 escrows.method('all', escrowsAll, {
   description: "lists all escrows of token",
@@ -201,7 +217,7 @@ escrows.method('all', escrowsAll, {
 });
 
 var escrowsRelease = function (escrowID, callback) {
-  post('/api/escrow_release/'+escrowID+'/', {}, callback);
+  localcoins.post('/api/escrow_release/'+escrowID+'/', {}, callback);
 };
 escrows.method('release', escrowsRelease, {
   description: "releases an escrow of token by escrowID",
@@ -216,9 +232,10 @@ escrows.method('release', escrowsRelease, {
 });
 
 var ads = resource.define('ads');
+ads.dependencies = {};
 
 var adsAll = function(callback) {
-  post('/api/ads/', {}, callback);
+  localcoins.post('/api/ads/', {}, callback);
 };
 ads.method('all', adsAll, {
   description: "lists all ads of token",
@@ -232,7 +249,7 @@ ads.method('all', adsAll, {
 var adsUpdate = function(options, callback) {
   var route = '/api/ad/'+options['id']+'/';
   delete options['id'];
-  post(route, options, callback);
+  localcoins.post(route, options, callback);
 };
 ads.method('update', adsUpdate, {
   description: "updates ad of token by id",
@@ -251,4 +268,11 @@ ads.method('update', adsUpdate, {
   }
 });
 
-resource.use('cli').createRouter([ads, escrows]).route();
+localcoins.ads = ads;
+localcoins.escrows = escrows;
+localcoins.resources = [ads, escrows];
+
+resource.use('cli').createRouter(localcoins.resources, {}, function(err, router) {
+  if (err) { throw err; }
+  router.route();
+});
