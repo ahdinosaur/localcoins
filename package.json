@@ -1,6 +1,6 @@
 {
   "name": "localcoins",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "cli interface to localbitcoins",
   "main": "index.js",
   "scripts": {
@@ -8,7 +8,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git://github.com/ahdinosaur/localbitcoins.git"
+    "url": "git://github.com/ahdinosaur/localcoins.git"
   },
   "keywords": [
     "bitcoin",
