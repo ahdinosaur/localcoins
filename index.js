@@ -97,7 +97,6 @@ var authFlow = function(callback) {
     localcoins.promptUserAndPass,
     localcoins.authUsingUserAndPass],
     function(err, credentials) {
-      console.log(err, credentials);
       if (err) {
         return callback(err);
       } else if (!credentials) {
