@@ -1,7 +1,6 @@
 var path = require('path'),
     url = require('url'),
     fs = require('fs'),
-    readline = require('readline'),
     resource = require('resource');
 
 var clientID = "cff0d0765c4648791ba9",
@@ -27,18 +26,14 @@ localcoins = resource.define('localcoins');
  * @return {string} result.pass
  */
 var promptUserAndPass = function (callback) {
-  var rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-  });
-  rl.question(site.name + " username: ", function(user) {
-    rl.question(site.name + " password: ", function(pass) {
-      console.log(user, pass);
-      rl.close();
-      return callback(null, {
-        user: user.trim(),
-        pass: pass.trim()
-      });
+  var prompt = require('prompt-lite');
+  prompt.start();
+  var schema = localcoins.authUsingUserAndPass.schema.properties.options;
+  schema.properties.pass.hidden = true;
+  prompt.get(schema, function(err, result) {
+    return callback(null, {
+      user: result.user.trim(),
+      pass: result.pass
     });
   });
 };
@@ -73,7 +68,25 @@ var authUsingUserAndPass = function (options, callback) {
     });
   });
 };
-localcoins.method('authUsingUserAndPass', authUsingUserAndPass);
+localcoins.method('authUsingUserAndPass', authUsingUserAndPass, {
+  description: "oauth using username and password",
+  properties: {
+    options: {
+      properties: {
+        user: {
+          description: site.name + " username",
+          type: 'string',
+          required: 'true'
+        },
+        pass: {
+          description: site.name + " password",
+          type: 'string',
+          required: 'true'
+        }
+      }
+    }
+  }
+});
 
 /**
  *
@@ -120,7 +133,6 @@ var writeConfig = function (config, callback) {
   fs.writeFile(configPath, str, callback);
 };
 localcoins.method('writeConfig', writeConfig);
-
 
 /**
  *
